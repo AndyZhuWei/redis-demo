@@ -331,6 +331,131 @@ previous_entry_length encoding content
 Redis并没有直接使用这些数据结构来实现键值对数据库，而是基于这些数据结构创建了一个对象系统，这个系统包含字符串
 对象、列表对象、哈希对象、集合对象和有序集合对象这五种类型的对象。每种对象都用到了至少一种我们前面所介绍的数据结构
 
+1.Redis使用对象来表示数据库中的键和值，每次当我们在Redis的数据库中新创建一个
+键值对时，我们至少会创建两个对象，一个对象用作键值对的键，另一个对象用作键
+值对的值
+
+Redis中的每个对象都由一个redisObject结构表示，该结构中和保运数据有关的三个属性
+分别是type属性、encoding属性和ptr属性
+typedef struct redisObject {
+    //类型
+    unsigned type:4;
+    //编码
+    unsigned encoding:4;
+    //指向底层实现数据结构的指针
+    void *ptr;
+    //...
+    
+}robj;
+
+1>type属性可以是一下类型常量中的一个
+
+REDIS_STRING 字符串对象 type命令输出为string
+REDIS_LIST 列表对象     type命令输出为list
+REDIS_HASH 哈希对象     type命令输出为hash
+REDIS_SET 集合对象      type命令输出为set
+REDIS_ZSET 有序集合对象  type命令输出为zset
+
+对于Redis数据库保存的键值对来说，键总是一个字符串对象，而值则可以是
+字符串对象、列表对象、哈希对象、集合对象或者有序集合对象的其中一种。
+因此：
+当我们称呼一个数据库键为“字符串键”时，我们指的是“这个数据库键所对应的值为字符串对象”
+当我们称呼一个键为“列表键”时，我们指的是“这个数据库键所对应的值为列表对象”
+TYPE命令的实现方式也与此类似，当我们对一个数据库键执行TYPE命令时，命令返回
+的结果为数据库键对应的值对象的类型，而不是键对象的类型
+
+2>编码和底层实现
+对象ptr指针指向对象的底层实现数据结构，而这些数据结构由
+对象的encoding属性决定
+
+编码常量                       底层数据结构
+REDIS_ENCODING_INT          long类型的正数
+REDIS_ENCODING_EMBSTR       embstr编码的简单动态字符串
+REDIS_ENCDING_RAW           简单动态字符串
+REDIS_ENCODING_HT           字典
+REDIS_ENCODING_LINKEDLIST   双端链表
+REDIS_ENCODING_ZIPLIST      压缩列表
+REDIS_ENCODING_INTSET       正数集合
+REDIS_ENCODING_SKIPLIST     跳跃表和字典
+
+每种类型的对象都至少使用两种不同的编码
+
+类型                编码                      对象
+REDIS_STRING       REDIS_ENCODING_INT       使用整数值实现的字符串对象
+REDIS_STRING       REDIS_ENCODING_EMBSTR    使用embstr编码的简单动态字符串实现的字符串对象
+REDIS_STRING       REDIS_ENCODING_RAW       使用简单动态字符串实现的字符串对象
+REDIS_LIST         REDIS_ENCODING_ZIPLIST   使用压缩列表实现的列表对象
+REDIS_LIST         REDIS_ENCODING_LINKEDLIST使用双端链表实现的列表对象
+REDIS_HASH         REDIS_ENCODING_ZIPLIST   使用压缩列表实现的哈希对象
+REDIS_HASH         REDIS_ENCODING_HT        使用字典实现的哈希对象
+REDIS_SET          REDIS_ENCODING_INTSET    使用整数集合实现的集合对象
+REDIS_SET          REDIS_ENCODING_HT        使用字典实现的集合对象
+REDIS_ZSET         REDIS_ENCODING_ZIPLIST   使用压缩列表实现的有序集合对象
+REDIS_ZSET         REDIS_ENCODING_SKIPLIST  使用跳跃表和字典实现的有序集合对象
+
+使用object encoding对不同编码的输出
+对象所使用的底层数据结构             编码常量             OBJECT ENCODING 命令输出
+整数                         REDIS_ENCODING_INT      "int"
+embstr编码的简单动态字符串(SDS) REDIS_ENCODING_EMBSTR    "embstr"
+简单动态字符串                 REDIS_ENCODING_RAW       "raw"
+字典                         REDIS_ENCODING_HT         "hashtable"
+双端链表                      REDIS_ENCODING_LINKEDLIST “linkedlist”
+压缩列表                      REDIS_ENCODING_ZIPLIST    “ziplist”
+整数集合                      REDIS_ENCODING_INTSET    "intset"
+跳跃表和字典                  REDIS_ENCODING_SKIPLIST   “skiplist”
+
+通过encoding属性来设定对象所使用的编码，而不是为特定类型的对象关联一种
+固定编码，极大提升了Redis的灵活性和效率，因为Redis可以根据不同的使用场景来
+为一个对象设置不同的编码，从而优化对象在某一场景下的效率。
+例子：
+在列表对象包含的元素比较少时，Redis使用压缩列表作为列表对象的底层实现：
+因为压缩列表比双端链表更节约内存，并且在元素数量较少时，在内存中以连续块方式
+保存的压缩列表比起双端链表可以更快被载入到缓存中
+随着列表对象包含的元素越来越多，使用压缩列表来保存元素的有事逐渐消失时，对
+对象就会将底层实现从压缩列表转向功能更强、也更适合保存大量元素的双端链表上面
+
+
+2.字符串对象
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
